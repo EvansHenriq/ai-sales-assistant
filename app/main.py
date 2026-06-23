@@ -1,0 +1,50 @@
+"""FastAPI application factory."""
+
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app import __version__
+from app.api.routers import health
+from app.core.config import Settings, get_settings
+from app.core.logging import configure_logging, get_logger
+from app.core.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    settings = get_settings()
+    configure_logging(settings.log_level, json_logs=settings.json_logs)
+    get_logger(__name__).info("startup", environment=settings.environment, version=__version__)
+    yield
+    get_logger(__name__).info("shutdown")
+
+
+def create_app(settings: Settings | None = None) -> FastAPI:
+    """Build the FastAPI app. Accepts injected settings for testing."""
+    settings = settings or get_settings()
+
+    app = FastAPI(
+        title=settings.app_name,
+        version=__version__,
+        lifespan=lifespan,
+    )
+
+    # Order matters: outermost middleware runs first on the way in.
+    app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(RequestContextMiddleware)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_allow_origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST"],
+        allow_headers=["Authorization", "Content-Type", "X-API-Key"],
+    )
+
+    app.include_router(health.router)
+    return app
+
+
+app = create_app()

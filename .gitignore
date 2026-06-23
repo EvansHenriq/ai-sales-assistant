@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+dist/
+build/
+
+# Virtualenv / uv
+.venv/
+
+# Environment & secrets — never commit real secrets
+.env
+.env.*
+!.env.example
+
+# Eval artifacts
+evals/reports/
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+*.log
