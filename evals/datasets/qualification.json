@@ -1,0 +1,20 @@
+[
+  {
+    "conversation": [
+      {"role": "user", "content": "We have a $50k budget approved and I'm the VP of Product. We need this live next month."}
+    ],
+    "expected_stage": "hot"
+  },
+  {
+    "conversation": [
+      {"role": "user", "content": "Just browsing for now, no budget or timeline yet."}
+    ],
+    "expected_stage": "cold"
+  },
+  {
+    "conversation": [
+      {"role": "user", "content": "We're evaluating options for next quarter; I'd need to check budget with my manager."}
+    ],
+    "expected_stage": "warm"
+  }
+]

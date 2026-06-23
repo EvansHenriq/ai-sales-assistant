@@ -1,0 +1,8 @@
+[
+  {"text": "You can reach me at dana@acme.com", "expected_types": ["EMAIL"]},
+  {"text": "My number is +1 (555) 010-2030", "expected_types": ["PHONE"]},
+  {"text": "Card 4111 1111 1111 1111 is on file", "expected_types": ["CREDIT_CARD"]},
+  {"text": "Meu CPF e 123.456.789-01", "expected_types": ["CPF"]},
+  {"text": "Just asking about pricing tiers.", "expected_types": []},
+  {"text": "We have 200 employees.", "expected_types": []}
+]

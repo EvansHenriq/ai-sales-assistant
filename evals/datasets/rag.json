@@ -1,0 +1,6 @@
+[
+  {"question": "How much does the Growth plan cost?", "expected_source": "FlowMetrics — Pricing"},
+  {"question": "Do you support single sign-on?", "expected_source": "FlowMetrics — Integrations & Security"},
+  {"question": "How long does setup take?", "expected_source": "FlowMetrics — FAQ"},
+  {"question": "What does FlowMetrics do?", "expected_source": "FlowMetrics — Product Overview"}
+]
