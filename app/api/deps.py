@@ -7,16 +7,17 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.openai_client import get_llm_client
-from app.agent.types import LLMClient
+from app.agent.types import AgentLLM
 from app.core.security import hash_api_key
 from app.db.models import ApiKey
 from app.db.session import get_session
+from app.qualification.service import QualificationService
 from app.rag.embeddings import OpenAIEmbedder
 from app.rag.retriever import PgVectorRetriever
 from app.rag.types import Retriever
 
 DbSession = Annotated[AsyncSession, Depends(get_session)]
-LLMClientDep = Annotated[LLMClient, Depends(get_llm_client)]
+LLMClientDep = Annotated[AgentLLM, Depends(get_llm_client)]
 
 
 def get_retriever(session: DbSession) -> Retriever:
@@ -24,6 +25,13 @@ def get_retriever(session: DbSession) -> Retriever:
 
 
 RetrieverDep = Annotated[Retriever, Depends(get_retriever)]
+
+
+def get_qualification_service(llm: LLMClientDep) -> QualificationService:
+    return QualificationService(llm)
+
+
+QualificationServiceDep = Annotated[QualificationService, Depends(get_qualification_service)]
 
 
 async def require_api_key(

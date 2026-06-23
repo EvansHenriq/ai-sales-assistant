@@ -7,7 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.db.models import Conversation, Message, MessageRole
+from app.db.models import Conversation, LeadQualification, Message, MessageRole
+from app.qualification.models import LeadQualificationResult
 
 
 class ConversationRepository:
@@ -55,3 +56,39 @@ class ConversationRepository:
             .order_by(Message.created_at)
         )
         return list(result.scalars().all())
+
+
+class QualificationRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def add(
+        self,
+        *,
+        conversation_id: UUID,
+        lead_id: UUID | None,
+        result: LeadQualificationResult,
+    ) -> LeadQualification:
+        qualification = LeadQualification(
+            conversation_id=conversation_id,
+            lead_id=lead_id,
+            budget=result.budget.value,
+            authority=result.authority.value,
+            need=result.need.value,
+            timeline=result.timeline.value,
+            score=result.score,
+            stage=result.stage.value,
+            rationale=result.rationale,
+        )
+        self._session.add(qualification)
+        await self._session.flush()
+        return qualification
+
+    async def latest_for_conversation(self, conversation_id: UUID) -> LeadQualification | None:
+        result = await self._session.execute(
+            select(LeadQualification)
+            .where(LeadQualification.conversation_id == conversation_id)
+            .order_by(LeadQualification.created_at.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()

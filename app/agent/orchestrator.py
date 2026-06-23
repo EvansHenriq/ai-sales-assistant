@@ -7,21 +7,14 @@ lead qualification, automation) are wired into this loop in later phases.
 from dataclasses import dataclass
 from uuid import UUID
 
+from app.agent.history import to_chat_messages
 from app.agent.prompts import SALES_ASSISTANT_SYSTEM_PROMPT
-from app.agent.types import ChatMessage, LLMClient, LLMUsage, Role
+from app.agent.types import LLMClient, LLMUsage
 from app.db.models import MessageRole
 from app.db.repositories import ConversationRepository
 from app.rag.types import RetrievedChunk, Retriever
 
 _RETRIEVAL_K = 4
-
-
-def _to_chat_role(role: MessageRole) -> Role | None:
-    if role == MessageRole.user:
-        return "user"
-    if role == MessageRole.assistant:
-        return "assistant"
-    return None
 
 
 def _format_context(chunks: list[RetrievedChunk]) -> str:
@@ -65,11 +58,7 @@ class AgentOrchestrator:
                 system_prompt = f"{system_prompt}{_format_context(chunks)}"
 
         history = await self._repo.list_messages(conversation_id)
-        chat_messages: list[ChatMessage] = []
-        for message in history:
-            chat_role = _to_chat_role(message.role)
-            if chat_role is not None:
-                chat_messages.append(ChatMessage(role=chat_role, content=message.content))
+        chat_messages = to_chat_messages(history)
 
         result = await self._llm.generate(system=system_prompt, messages=chat_messages)
 

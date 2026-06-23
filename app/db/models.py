@@ -147,3 +147,23 @@ class KnowledgeChunk(Base, TimestampMixin):
     )
 
     document: Mapped[Document] = relationship(back_populates="chunks")
+
+
+class LeadQualification(Base, TimestampMixin):
+    __tablename__ = "lead_qualifications"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    conversation_id: Mapped[UUID] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    lead_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("leads.id", ondelete="SET NULL"), nullable=True
+    )
+    # BANT levels and stage are stored as their string values.
+    budget: Mapped[str] = mapped_column(String(16), nullable=False)
+    authority: Mapped[str] = mapped_column(String(16), nullable=False)
+    need: Mapped[str] = mapped_column(String(16), nullable=False)
+    timeline: Mapped[str] = mapped_column(String(16), nullable=False)
+    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    stage: Mapped[str] = mapped_column(String(16), nullable=False)
+    rationale: Mapped[str] = mapped_column(Text, nullable=False)

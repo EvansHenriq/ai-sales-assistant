@@ -45,3 +45,18 @@ class MessageTurnResponse(BaseModel):
     conversation_id: UUID
     reply: str
     usage: UsageRead
+
+
+class QualificationRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    conversation_id: UUID
+    budget: str
+    authority: str
+    need: str
+    timeline: str
+    score: int
+    stage: str
+    rationale: str
+    created_at: datetime

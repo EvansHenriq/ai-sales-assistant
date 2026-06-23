@@ -7,6 +7,8 @@ directly, so it can be exercised with a fake in tests.
 from dataclasses import dataclass
 from typing import Literal, Protocol, runtime_checkable
 
+from pydantic import BaseModel
+
 Role = Literal["user", "assistant"]
 
 
@@ -30,6 +32,13 @@ class LLMResult:
     model: str
 
 
+@dataclass(frozen=True)
+class StructuredResult[T]:
+    parsed: T
+    usage: LLMUsage
+    model: str
+
+
 @runtime_checkable
 class LLMClient(Protocol):
     """Minimal surface the agent needs from a language model provider."""
@@ -41,3 +50,20 @@ class LLMClient(Protocol):
         messages: list[ChatMessage],
         model: str | None = None,
     ) -> LLMResult: ...
+
+
+class StructuredLLMClient(Protocol):
+    """Provider that can return a parsed Pydantic object (structured output)."""
+
+    async def parse[T: BaseModel](
+        self,
+        *,
+        system: str,
+        messages: list[ChatMessage],
+        schema: type[T],
+        model: str | None = None,
+    ) -> StructuredResult[T]: ...
+
+
+class AgentLLM(LLMClient, StructuredLLMClient, Protocol):
+    """Both free-text generation and structured parsing."""

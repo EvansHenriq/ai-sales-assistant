@@ -10,9 +10,16 @@ from typing import cast
 
 from openai import AsyncOpenAI
 from openai.types.responses import Response, ResponseInputParam
+from pydantic import BaseModel
 
 from app.agent.pricing import estimate_cost_usd
-from app.agent.types import ChatMessage, LLMClient, LLMResult, LLMUsage
+from app.agent.types import (
+    AgentLLM,
+    ChatMessage,
+    LLMResult,
+    LLMUsage,
+    StructuredResult,
+)
 from app.core.config import get_settings
 from app.core.logging import get_logger
 
@@ -73,8 +80,43 @@ class OpenAIClient:
         )
         return LLMResult(text=response.output_text, usage=usage, model=model)
 
+    async def parse[T: BaseModel](
+        self,
+        *,
+        system: str,
+        messages: list[ChatMessage],
+        schema: type[T],
+        model: str | None = None,
+    ) -> StructuredResult[T]:
+        model = model or self._default_model
+        request_input = cast(
+            ResponseInputParam, [{"role": m.role, "content": m.content} for m in messages]
+        )
+        start = time.perf_counter()
+        response = await self._client.responses.parse(
+            model=model,
+            instructions=system,
+            input=request_input,
+            text_format=schema,
+        )
+        latency_ms = round((time.perf_counter() - start) * 1000, 1)
+        usage = _extract_usage(response)
+        parsed = response.output_parsed
+        if parsed is None:
+            raise RuntimeError("OpenAI structured parse returned no parsed output")
+        logger.info(
+            "llm.parse",
+            model=model,
+            schema=schema.__name__,
+            input_tokens=usage.input_tokens,
+            output_tokens=usage.output_tokens,
+            latency_ms=latency_ms,
+            estimated_cost_usd=estimate_cost_usd(model, usage.input_tokens, usage.output_tokens),
+        )
+        return StructuredResult(parsed=parsed, usage=usage, model=model)
+
 
 @lru_cache
-def get_llm_client() -> LLMClient:
+def get_llm_client() -> AgentLLM:
     """Return a process-wide LLM client (reuses the underlying HTTP client)."""
     return OpenAIClient()

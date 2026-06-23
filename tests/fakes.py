@@ -1,15 +1,24 @@
 """Reusable test doubles."""
 
-from app.agent.types import ChatMessage, LLMResult, LLMUsage
+from typing import Any
+
+from pydantic import BaseModel
+
+from app.agent.types import ChatMessage, LLMResult, LLMUsage, StructuredResult
 from app.rag.types import RetrievedChunk
 
 
 class FakeLLMClient:
-    """In-memory LLM client for tests; records calls and returns a canned reply."""
+    """In-memory LLM client for tests; records calls and returns canned output.
 
-    def __init__(self, reply: str = "Hello from Aria.") -> None:
+    Set ``parsed`` to control what ``parse`` returns (structured outputs).
+    """
+
+    def __init__(self, reply: str = "Hello from Aria.", parsed: Any = None) -> None:
         self.reply = reply
+        self.parsed = parsed
         self.calls: list[dict[str, object]] = []
+        self.parse_calls: list[dict[str, object]] = []
 
     async def generate(
         self, *, system: str, messages: list[ChatMessage], model: str | None = None
@@ -18,6 +27,23 @@ class FakeLLMClient:
         return LLMResult(
             text=self.reply,
             usage=LLMUsage(input_tokens=10, output_tokens=5, total_tokens=15),
+            model=model or "fake-model",
+        )
+
+    async def parse[T: BaseModel](
+        self,
+        *,
+        system: str,
+        messages: list[ChatMessage],
+        schema: type[T],
+        model: str | None = None,
+    ) -> StructuredResult[T]:
+        self.parse_calls.append(
+            {"system": system, "messages": list(messages), "schema": schema, "model": model}
+        )
+        return StructuredResult(
+            parsed=self.parsed,
+            usage=LLMUsage(input_tokens=8, output_tokens=4, total_tokens=12),
             model=model or "fake-model",
         )
 

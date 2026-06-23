@@ -5,17 +5,25 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request, status
 
+from app.agent.history import to_chat_messages
 from app.agent.orchestrator import AgentOrchestrator
-from app.api.deps import DbSession, LLMClientDep, RequireApiKey, RetrieverDep
+from app.api.deps import (
+    DbSession,
+    LLMClientDep,
+    QualificationServiceDep,
+    RequireApiKey,
+    RetrieverDep,
+)
 from app.api.schemas import (
     ConversationCreate,
     ConversationRead,
     MessageCreate,
     MessageTurnResponse,
+    QualificationRead,
     UsageRead,
 )
 from app.core.rate_limit import limiter, rate_limit
-from app.db.repositories import ConversationRepository
+from app.db.repositories import ConversationRepository, QualificationRepository
 
 router = APIRouter(prefix="/v1/conversations", tags=["conversations"])
 
@@ -85,3 +93,45 @@ async def post_message(
             total_tokens=result.usage.total_tokens,
         ),
     )
+
+
+@router.post("/{conversation_id}/qualify", response_model=QualificationRead)
+@limiter.limit(rate_limit)
+async def qualify_conversation(
+    request: Request,
+    conversation_id: UUID,
+    session: DbSession,
+    qualifier: QualificationServiceDep,
+    _: RequireApiKey,
+) -> QualificationRead:
+    repo = ConversationRepository(session)
+    conversation = await repo.get(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+
+    chat_messages = to_chat_messages(await repo.list_messages(conversation_id))
+    if not chat_messages:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Conversation has no messages to qualify",
+        )
+
+    result, _usage = await qualifier.qualify(chat_messages)
+    qualification = await QualificationRepository(session).add(
+        conversation_id=conversation_id, lead_id=conversation.lead_id, result=result
+    )
+    return QualificationRead.model_validate(qualification)
+
+
+@router.get("/{conversation_id}/qualification", response_model=QualificationRead)
+@limiter.limit(rate_limit)
+async def get_qualification(
+    request: Request,
+    conversation_id: UUID,
+    session: DbSession,
+    _: RequireApiKey,
+) -> QualificationRead:
+    qualification = await QualificationRepository(session).latest_for_conversation(conversation_id)
+    if qualification is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No qualification found")
+    return QualificationRead.model_validate(qualification)
