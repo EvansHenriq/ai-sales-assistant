@@ -10,6 +10,7 @@ from app.agent.orchestrator import AgentOrchestrator
 from app.api.deps import (
     DbSession,
     LLMClientDep,
+    ModerationDep,
     QualificationServiceDep,
     RequireApiKey,
     RetrieverDep,
@@ -73,6 +74,7 @@ async def post_message(
     session: DbSession,
     llm: LLMClientDep,
     retriever: RetrieverDep,
+    moderation: ModerationDep,
     _: RequireApiKey,
 ) -> MessageTurnResponse:
     repo = ConversationRepository(session)
@@ -80,7 +82,7 @@ async def post_message(
     if conversation is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
 
-    orchestrator = AgentOrchestrator(llm=llm, repo=repo, retriever=retriever)
+    orchestrator = AgentOrchestrator(llm=llm, repo=repo, retriever=retriever, moderation=moderation)
     result = await orchestrator.handle_turn(
         conversation_id=conversation_id, user_message=payload.content
     )

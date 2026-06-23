@@ -5,6 +5,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from app.agent.types import ChatMessage, LLMResult, LLMUsage, StructuredResult
+from app.guardrails.moderation import ModerationResult
 from app.rag.types import RetrievedChunk
 
 
@@ -72,3 +73,16 @@ class FakeRetriever:
     async def search(self, query: str, *, k: int = 4) -> list[RetrievedChunk]:
         self.queries.append(query)
         return list(self.chunks[:k])
+
+
+class FakeModeration:
+    """Moderation client that returns a preconfigured verdict."""
+
+    def __init__(self, flagged: bool = False, categories: list[str] | None = None) -> None:
+        self.flagged = flagged
+        self.categories = categories or []
+        self.calls: list[str] = []
+
+    async def moderate(self, text: str) -> ModerationResult:
+        self.calls.append(text)
+        return ModerationResult(flagged=self.flagged, categories=self.categories)

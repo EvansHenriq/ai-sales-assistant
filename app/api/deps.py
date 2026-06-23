@@ -11,6 +11,7 @@ from app.agent.types import AgentLLM
 from app.core.security import hash_api_key
 from app.db.models import ApiKey
 from app.db.session import get_session
+from app.guardrails.moderation import ModerationClient, OpenAIModerationClient
 from app.qualification.service import QualificationService
 from app.rag.embeddings import OpenAIEmbedder
 from app.rag.retriever import PgVectorRetriever
@@ -18,6 +19,13 @@ from app.rag.types import Retriever
 
 DbSession = Annotated[AsyncSession, Depends(get_session)]
 LLMClientDep = Annotated[AgentLLM, Depends(get_llm_client)]
+
+
+def get_moderation_client() -> ModerationClient:
+    return OpenAIModerationClient()
+
+
+ModerationDep = Annotated[ModerationClient, Depends(get_moderation_client)]
 
 
 def get_retriever(session: DbSession) -> Retriever:

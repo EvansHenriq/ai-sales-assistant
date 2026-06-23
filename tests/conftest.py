@@ -19,12 +19,12 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import StaticPool
 
-from app.api.deps import get_retriever
+from app.api.deps import get_moderation_client, get_retriever
 from app.core.security import generate_api_key, hash_api_key
 from app.db.models import ApiKey, Base
 from app.db.session import get_session
 from app.main import create_app
-from tests.fakes import FakeLLMClient, FakeRetriever
+from tests.fakes import FakeLLMClient, FakeModeration, FakeRetriever
 
 
 @pytest.fixture
@@ -72,11 +72,12 @@ async def client_with_db(
     app: FastAPI,
     db_sessionmaker: async_sessionmaker[AsyncSession],
     fake_retriever: FakeRetriever,
+    fake_moderation: FakeModeration,
 ) -> AsyncIterator[AsyncClient]:
     """Test client whose DB session is backed by the in-memory database.
 
-    The retriever is overridden with a fake so endpoint tests never call OpenAI;
-    the LLM client is overridden per-test where needed.
+    Retriever and moderation are overridden with fakes so endpoint tests never
+    call OpenAI; the LLM client is overridden per-test where needed.
     """
 
     async def _get_session() -> AsyncIterator[AsyncSession]:
@@ -90,6 +91,7 @@ async def client_with_db(
 
     app.dependency_overrides[get_session] = _get_session
     app.dependency_overrides[get_retriever] = lambda: fake_retriever
+    app.dependency_overrides[get_moderation_client] = lambda: fake_moderation
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as async_client:
         yield async_client
@@ -99,6 +101,11 @@ async def client_with_db(
 @pytest.fixture
 def fake_retriever() -> FakeRetriever:
     return FakeRetriever()
+
+
+@pytest.fixture
+def fake_moderation() -> FakeModeration:
+    return FakeModeration()
 
 
 @pytest.fixture
