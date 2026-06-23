@@ -11,7 +11,9 @@ import enum
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
+    JSON,
     DateTime,
     Enum,
     ForeignKey,
@@ -22,6 +24,9 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+# Dimension of OpenAI text-embedding-3-small vectors.
+EMBEDDING_DIM = 1536
 
 
 class Base(DeclarativeBase):
@@ -111,3 +116,34 @@ class Message(Base, TimestampMixin):
     tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     conversation: Mapped[Conversation] = relationship(back_populates="messages")
+
+
+class Document(Base, TimestampMixin):
+    __tablename__ = "documents"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    source: Mapped[str] = mapped_column(String(300), nullable=False)
+
+    chunks: Mapped[list[KnowledgeChunk]] = relationship(
+        back_populates="document", cascade="all, delete-orphan"
+    )
+
+
+class KnowledgeChunk(Base, TimestampMixin):
+    __tablename__ = "knowledge_chunks"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    document_id: Mapped[UUID] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # Denormalized document title, returned with retrieval results as the source.
+    source: Mapped[str] = mapped_column(String(300), nullable=False)
+    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    # pgvector column on Postgres; JSON fallback on SQLite (used by unit tests).
+    embedding: Mapped[list[float]] = mapped_column(
+        Vector(EMBEDDING_DIM).with_variant(JSON(), "sqlite"), nullable=False
+    )
+
+    document: Mapped[Document] = relationship(back_populates="chunks")

@@ -11,9 +11,19 @@ from app.agent.types import LLMClient
 from app.core.security import hash_api_key
 from app.db.models import ApiKey
 from app.db.session import get_session
+from app.rag.embeddings import OpenAIEmbedder
+from app.rag.retriever import PgVectorRetriever
+from app.rag.types import Retriever
 
 DbSession = Annotated[AsyncSession, Depends(get_session)]
 LLMClientDep = Annotated[LLMClient, Depends(get_llm_client)]
+
+
+def get_retriever(session: DbSession) -> Retriever:
+    return PgVectorRetriever(session, OpenAIEmbedder())
+
+
+RetrieverDep = Annotated[Retriever, Depends(get_retriever)]
 
 
 async def require_api_key(

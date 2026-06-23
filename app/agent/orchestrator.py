@@ -11,6 +11,9 @@ from app.agent.prompts import SALES_ASSISTANT_SYSTEM_PROMPT
 from app.agent.types import ChatMessage, LLMClient, LLMUsage, Role
 from app.db.models import MessageRole
 from app.db.repositories import ConversationRepository
+from app.rag.types import RetrievedChunk, Retriever
+
+_RETRIEVAL_K = 4
 
 
 def _to_chat_role(role: MessageRole) -> Role | None:
@@ -19,6 +22,15 @@ def _to_chat_role(role: MessageRole) -> Role | None:
     if role == MessageRole.assistant:
         return "assistant"
     return None
+
+
+def _format_context(chunks: list[RetrievedChunk]) -> str:
+    blocks = [f"[Source: {chunk.source}]\n{chunk.content}" for chunk in chunks]
+    return (
+        "\n\n# Knowledge base\n"
+        "Use the following retrieved context to ground your answer and cite the "
+        "source titles. If it does not contain the answer, say so.\n\n" + "\n\n".join(blocks)
+    )
 
 
 @dataclass(frozen=True)
@@ -33,16 +45,24 @@ class AgentOrchestrator:
         *,
         llm: LLMClient,
         repo: ConversationRepository,
+        retriever: Retriever | None = None,
         system_prompt: str = SALES_ASSISTANT_SYSTEM_PROMPT,
     ) -> None:
         self._llm = llm
         self._repo = repo
+        self._retriever = retriever
         self._system_prompt = system_prompt
 
     async def handle_turn(self, *, conversation_id: UUID, user_message: str) -> TurnResult:
         await self._repo.add_message(
             conversation_id=conversation_id, role=MessageRole.user, content=user_message
         )
+
+        system_prompt = self._system_prompt
+        if self._retriever is not None:
+            chunks = await self._retriever.search(user_message, k=_RETRIEVAL_K)
+            if chunks:
+                system_prompt = f"{system_prompt}{_format_context(chunks)}"
 
         history = await self._repo.list_messages(conversation_id)
         chat_messages: list[ChatMessage] = []
@@ -51,7 +71,7 @@ class AgentOrchestrator:
             if chat_role is not None:
                 chat_messages.append(ChatMessage(role=chat_role, content=message.content))
 
-        result = await self._llm.generate(system=self._system_prompt, messages=chat_messages)
+        result = await self._llm.generate(system=system_prompt, messages=chat_messages)
 
         await self._repo.add_message(
             conversation_id=conversation_id,

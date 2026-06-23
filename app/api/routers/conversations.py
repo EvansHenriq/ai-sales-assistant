@@ -6,7 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Request, status
 
 from app.agent.orchestrator import AgentOrchestrator
-from app.api.deps import DbSession, LLMClientDep, RequireApiKey
+from app.api.deps import DbSession, LLMClientDep, RequireApiKey, RetrieverDep
 from app.api.schemas import (
     ConversationCreate,
     ConversationRead,
@@ -64,6 +64,7 @@ async def post_message(
     payload: MessageCreate,
     session: DbSession,
     llm: LLMClientDep,
+    retriever: RetrieverDep,
     _: RequireApiKey,
 ) -> MessageTurnResponse:
     repo = ConversationRepository(session)
@@ -71,7 +72,7 @@ async def post_message(
     if conversation is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
 
-    orchestrator = AgentOrchestrator(llm=llm, repo=repo)
+    orchestrator = AgentOrchestrator(llm=llm, repo=repo, retriever=retriever)
     result = await orchestrator.handle_turn(
         conversation_id=conversation_id, user_message=payload.content
     )
