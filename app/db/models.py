@@ -167,3 +167,19 @@ class LeadQualification(Base, TimestampMixin):
     score: Mapped[int] = mapped_column(Integer, nullable=False)
     stage: Mapped[str] = mapped_column(String(16), nullable=False)
     rationale: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class DemoBooking(Base, TimestampMixin):
+    __tablename__ = "demo_bookings"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    conversation_id: Mapped[UUID] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    lead_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("leads.id", ondelete="SET NULL"), nullable=True
+    )
+    # Free-text requested slot (e.g. "next Tuesday 2pm") captured from the chat.
+    requested_time: Mapped[str] = mapped_column(String(200), nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="requested")

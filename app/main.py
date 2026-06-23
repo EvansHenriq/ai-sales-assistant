@@ -9,7 +9,7 @@ from slowapi.errors import RateLimitExceeded
 from starlette.responses import JSONResponse
 
 from app import __version__
-from app.api.routers import conversations, health
+from app.api.routers import automation, conversations, health
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging, get_logger
 from app.core.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
@@ -60,6 +60,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(health.router)
     app.include_router(conversations.router)
+    app.include_router(automation.router)
     return app
 
 

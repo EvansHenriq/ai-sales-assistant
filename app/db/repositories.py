@@ -7,7 +7,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.db.models import Conversation, LeadQualification, Message, MessageRole
+from app.db.models import (
+    Conversation,
+    DemoBooking,
+    Lead,
+    LeadQualification,
+    Message,
+    MessageRole,
+)
 from app.qualification.models import LeadQualificationResult
 
 
@@ -92,3 +99,60 @@ class QualificationRepository:
             .limit(1)
         )
         return result.scalar_one_or_none()
+
+
+class LeadRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def upsert(
+        self,
+        *,
+        name: str | None = None,
+        email: str | None = None,
+        company: str | None = None,
+        phone: str | None = None,
+    ) -> Lead:
+        """Update an existing lead matched by email, or create a new one."""
+        lead: Lead | None = None
+        if email:
+            result = await self._session.execute(select(Lead).where(Lead.email == email).limit(1))
+            lead = result.scalar_one_or_none()
+
+        if lead is None:
+            lead = Lead(name=name, email=email, company=company, phone=phone)
+            self._session.add(lead)
+        else:
+            if name is not None:
+                lead.name = name
+            if company is not None:
+                lead.company = company
+            if phone is not None:
+                lead.phone = phone
+
+        await self._session.flush()
+        return lead
+
+
+class DemoBookingRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def create(
+        self,
+        *,
+        conversation_id: UUID,
+        lead_id: UUID | None,
+        requested_time: str,
+        notes: str | None = None,
+    ) -> DemoBooking:
+        booking = DemoBooking(
+            conversation_id=conversation_id,
+            lead_id=lead_id,
+            requested_time=requested_time,
+            notes=notes,
+            status="requested",
+        )
+        self._session.add(booking)
+        await self._session.flush()
+        return booking
