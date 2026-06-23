@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.db.models import ConversationStatus, MessageRole
 
@@ -29,3 +29,19 @@ class ConversationRead(BaseModel):
     lead_id: UUID | None
     created_at: datetime
     messages: list[MessageRead] = []
+
+
+class MessageCreate(BaseModel):
+    content: str = Field(min_length=1, max_length=8000)
+
+
+class UsageRead(BaseModel):
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
+
+
+class MessageTurnResponse(BaseModel):
+    conversation_id: UUID
+    reply: str
+    usage: UsageRead

@@ -5,8 +5,15 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request, status
 
-from app.api.deps import DbSession, RequireApiKey
-from app.api.schemas import ConversationCreate, ConversationRead
+from app.agent.orchestrator import AgentOrchestrator
+from app.api.deps import DbSession, LLMClientDep, RequireApiKey
+from app.api.schemas import (
+    ConversationCreate,
+    ConversationRead,
+    MessageCreate,
+    MessageTurnResponse,
+    UsageRead,
+)
 from app.core.rate_limit import limiter, rate_limit
 from app.db.repositories import ConversationRepository
 
@@ -47,3 +54,33 @@ async def get_conversation(
     if conversation is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
     return ConversationRead.model_validate(conversation)
+
+
+@router.post("/{conversation_id}/messages", response_model=MessageTurnResponse)
+@limiter.limit(rate_limit)
+async def post_message(
+    request: Request,
+    conversation_id: UUID,
+    payload: MessageCreate,
+    session: DbSession,
+    llm: LLMClientDep,
+    _: RequireApiKey,
+) -> MessageTurnResponse:
+    repo = ConversationRepository(session)
+    conversation = await repo.get(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+
+    orchestrator = AgentOrchestrator(llm=llm, repo=repo)
+    result = await orchestrator.handle_turn(
+        conversation_id=conversation_id, user_message=payload.content
+    )
+    return MessageTurnResponse(
+        conversation_id=conversation_id,
+        reply=result.reply,
+        usage=UsageRead(
+            input_tokens=result.usage.input_tokens,
+            output_tokens=result.usage.output_tokens,
+            total_tokens=result.usage.total_tokens,
+        ),
+    )

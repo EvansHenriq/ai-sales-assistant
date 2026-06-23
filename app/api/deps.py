@@ -6,11 +6,14 @@ from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agent.openai_client import get_llm_client
+from app.agent.types import LLMClient
 from app.core.security import hash_api_key
 from app.db.models import ApiKey
 from app.db.session import get_session
 
 DbSession = Annotated[AsyncSession, Depends(get_session)]
+LLMClientDep = Annotated[LLMClient, Depends(get_llm_client)]
 
 
 async def require_api_key(

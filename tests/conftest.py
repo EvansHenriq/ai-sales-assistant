@@ -5,7 +5,7 @@ every session sees the same data). The Phase 1 schema is dialect-agnostic;
 Postgres/pgvector-specific behaviour is covered by tests marked ``integration``.
 """
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 
 import pytest
 from asgi_lifespan import LifespanManager
@@ -19,9 +19,11 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import StaticPool
 
-from app.db.models import Base
+from app.core.security import generate_api_key, hash_api_key
+from app.db.models import ApiKey, Base
 from app.db.session import get_session
 from app.main import create_app
+from tests.fakes import FakeLLMClient
 
 
 @pytest.fixture
@@ -84,3 +86,24 @@ async def client_with_db(
     async with AsyncClient(transport=transport, base_url="http://test") as async_client:
         yield async_client
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def fake_llm() -> FakeLLMClient:
+    return FakeLLMClient()
+
+
+@pytest.fixture
+def seed_api_key(
+    db_sessionmaker: async_sessionmaker[AsyncSession],
+) -> Callable[..., Awaitable[str]]:
+    """Return an async helper that inserts an API key and returns the raw key."""
+
+    async def _seed(name: str = "test") -> str:
+        raw_key = generate_api_key()
+        async with db_sessionmaker() as session:
+            session.add(ApiKey(name=name, key_hash=hash_api_key(raw_key)))
+            await session.commit()
+        return raw_key
+
+    return _seed

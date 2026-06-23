@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     openai_model_cheap: str = "gpt-4.1-mini"
     openai_embedding_model: str = "text-embedding-3-small"
     openai_moderation_model: str = "omni-moderation-latest"
+    openai_timeout: float = 30.0
+    openai_max_retries: int = 2
 
     # --- Security ---
     cors_allow_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
