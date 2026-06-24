@@ -25,8 +25,10 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-# Dimension of OpenAI text-embedding-3-small vectors.
-EMBEDDING_DIM = 1536
+from app.core.config import get_settings
+
+# Embedding vector dimension (configurable to match the embedding model).
+EMBEDDING_DIM = get_settings().embedding_dim
 
 
 class Base(DeclarativeBase):

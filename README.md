@@ -1,5 +1,7 @@
 # AI Sales Assistant
 
+[![CI](https://github.com/EvansHenriq/ai-sales-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/EvansHenriq/ai-sales-assistant/actions/workflows/ci.yml)
+
 > A security-first AI sales assistant for **lead qualification**, **context
 > analysis** and **service automation** in a B2B SaaS scenario. Built to
 > demonstrate production-minded AI engineering: RAG, structured outputs,
@@ -41,9 +43,9 @@ client ──▶ API (auth + rate limit + validation)
         Orchestrator
    ┌─────────┼───────────────────────────────┐
    ▼         ▼              ▼                  ▼
- input     RAG          OpenAI            output
+ input     RAG          OpenAI-compatible output
  guardrails retrieval   generation        moderation
- (injection (pgvector)  (Responses API)   (safe fallback)
+ (injection (pgvector)  (Chat Completions)(safe fallback)
   + PII)        │
                persist (messages, leads, qualifications, bookings)
 ```
@@ -92,14 +94,43 @@ uv run python scripts/create_api_key.py "demo"      # prints the key once
 uv run python scripts/demo_conversation.py --api-key <KEY>
 ```
 
-### Running without an OpenAI key
+### Run for free with Ollama (no OpenAI key)
 
-Live inference uses OpenAI, so the chat/qualification demo needs a funded
-`OPENAI_API_KEY` (bring your own). Everything that does **not** depend on live
-inference runs for free: the full test suite and the deterministic guardrail eval
-suites (they mock the model), plus browsing the API contract at `/docs`. The LLM
-provider sits behind small protocols, so an alternative provider could be added
-without touching the rest of the app.
+The LLM client uses the Chat Completions API, so it also works against a local
+[Ollama](https://ollama.com) — real inference, $0, no key. Verified with
+`llama3.2:3b` (chat + BANT structured outputs) and `nomic-embed-text` (embeddings).
+
+```bash
+# 1. Models
+ollama pull llama3.2:3b
+ollama pull nomic-embed-text
+
+# 2. Database (Docker, just Postgres+pgvector)
+docker compose -f docker/docker-compose.yml up -d db
+
+# 3. Config + migrate (DDL as the superuser) + run the API locally
+cp .env.ollama.example .env
+# bash:
+DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/sales_assistant uv run alembic upgrade head
+# PowerShell:
+#   $env:DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/sales_assistant"; uv run alembic upgrade head; Remove-Item Env:DATABASE_URL
+uv run uvicorn app.main:app
+
+# 4. Smoke-test the provider, then seed + demo (another shell)
+uv run python scripts/verify_provider.py
+uv run python scripts/seed_knowledge.py
+uv run python scripts/create_api_key.py demo
+uv run python scripts/demo_conversation.py --api-key <KEY>
+```
+
+You still need a PostgreSQL+pgvector database (the app persists everything); the
+easiest is Docker Desktop for just the `db` service, as above.
+
+### Running without any LLM provider
+
+Even with no provider configured, plenty runs for free: the full test suite and
+the deterministic guardrail eval suites (they mock the model), plus browsing the
+API contract at `/docs`.
 
 ## Evaluation
 

@@ -15,6 +15,7 @@ class OpenAIEmbedder:
             settings = get_settings()
             self._client = AsyncOpenAI(
                 api_key=settings.openai_api_key.get_secret_value(),
+                base_url=settings.openai_base_url,
                 timeout=settings.openai_timeout,
                 max_retries=settings.openai_max_retries,
             )

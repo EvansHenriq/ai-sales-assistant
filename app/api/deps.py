@@ -8,10 +8,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agent.openai_client import get_llm_client
 from app.agent.types import AgentLLM
+from app.core.config import get_settings
 from app.core.security import hash_api_key
 from app.db.models import ApiKey
 from app.db.session import get_session
-from app.guardrails.moderation import ModerationClient, OpenAIModerationClient
+from app.guardrails.moderation import (
+    ModerationClient,
+    NoOpModerationClient,
+    OpenAIModerationClient,
+)
 from app.qualification.service import QualificationService
 from app.rag.embeddings import OpenAIEmbedder
 from app.rag.retriever import PgVectorRetriever
@@ -22,7 +27,9 @@ LLMClientDep = Annotated[AgentLLM, Depends(get_llm_client)]
 
 
 def get_moderation_client() -> ModerationClient:
-    return OpenAIModerationClient()
+    if get_settings().moderation_enabled:
+        return OpenAIModerationClient()
+    return NoOpModerationClient()
 
 
 ModerationDep = Annotated[ModerationClient, Depends(get_moderation_client)]

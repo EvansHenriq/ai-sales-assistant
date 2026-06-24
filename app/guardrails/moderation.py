@@ -38,3 +38,10 @@ class OpenAIModerationClient:
         result = response.results[0]
         categories = [name for name, value in result.categories.model_dump().items() if value]
         return ModerationResult(flagged=result.flagged, categories=categories)
+
+
+class NoOpModerationClient:
+    """Moderation client for providers without a moderation endpoint (e.g. Ollama)."""
+
+    async def moderate(self, text: str) -> ModerationResult:
+        return ModerationResult(flagged=False, categories=[])

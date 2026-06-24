@@ -1,7 +1,9 @@
-"""OpenAI-backed implementation of the ``LLMClient`` protocol.
+"""LLM client over the Chat Completions API.
 
-Wraps the AsyncOpenAI Responses API and logs token usage, latency and estimated
-cost on every call (lightweight observability).
+Chat Completions is supported by OpenAI and by OpenAI-compatible providers such
+as a local Ollama, so the same client works against either (selected via
+``OPENAI_BASE_URL``). Token usage, latency and estimated cost are logged on every
+call (lightweight observability).
 """
 
 import time
@@ -9,36 +11,36 @@ from functools import lru_cache
 from typing import cast
 
 from openai import AsyncOpenAI
-from openai.types.responses import Response, ResponseInputParam
+from openai.types.chat import ChatCompletion, ChatCompletionMessageParam
 from pydantic import BaseModel
 
 from app.agent.pricing import estimate_cost_usd
-from app.agent.types import (
-    AgentLLM,
-    ChatMessage,
-    LLMResult,
-    LLMUsage,
-    StructuredResult,
-)
+from app.agent.types import AgentLLM, ChatMessage, LLMResult, LLMUsage, StructuredResult
 from app.core.config import get_settings
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
 
-def _extract_usage(response: Response) -> LLMUsage:
+def _extract_usage(response: ChatCompletion) -> LLMUsage:
     usage = response.usage
     if usage is None:
         return LLMUsage(input_tokens=0, output_tokens=0, total_tokens=0)
     return LLMUsage(
-        input_tokens=usage.input_tokens,
-        output_tokens=usage.output_tokens,
+        input_tokens=usage.prompt_tokens,
+        output_tokens=usage.completion_tokens,
         total_tokens=usage.total_tokens,
     )
 
 
+def _build_messages(system: str, messages: list[ChatMessage]) -> list[ChatCompletionMessageParam]:
+    payload: list[dict[str, str]] = [{"role": "system", "content": system}]
+    payload.extend({"role": m.role, "content": m.content} for m in messages)
+    return cast(list[ChatCompletionMessageParam], payload)
+
+
 class OpenAIClient:
-    """Concrete LLM client using the OpenAI Responses API."""
+    """Chat Completions client (OpenAI or any compatible provider)."""
 
     def __init__(
         self, client: AsyncOpenAI | None = None, *, default_model: str | None = None
@@ -46,27 +48,19 @@ class OpenAIClient:
         settings = get_settings()
         self._client = client or AsyncOpenAI(
             api_key=settings.openai_api_key.get_secret_value(),
+            base_url=settings.openai_base_url,
             timeout=settings.openai_timeout,
             max_retries=settings.openai_max_retries,
         )
         self._default_model = default_model or settings.openai_model
 
     async def generate(
-        self,
-        *,
-        system: str,
-        messages: list[ChatMessage],
-        model: str | None = None,
+        self, *, system: str, messages: list[ChatMessage], model: str | None = None
     ) -> LLMResult:
         model = model or self._default_model
-        request_input = cast(
-            ResponseInputParam, [{"role": m.role, "content": m.content} for m in messages]
-        )
         start = time.perf_counter()
-        response = await self._client.responses.create(
-            model=model,
-            instructions=system,
-            input=request_input,
+        response = await self._client.chat.completions.create(
+            model=model, messages=_build_messages(system, messages)
         )
         latency_ms = round((time.perf_counter() - start) * 1000, 1)
         usage = _extract_usage(response)
@@ -78,7 +72,7 @@ class OpenAIClient:
             latency_ms=latency_ms,
             estimated_cost_usd=estimate_cost_usd(model, usage.input_tokens, usage.output_tokens),
         )
-        return LLMResult(text=response.output_text, usage=usage, model=model)
+        return LLMResult(text=response.choices[0].message.content or "", usage=usage, model=model)
 
     async def parse[T: BaseModel](
         self,
@@ -89,21 +83,17 @@ class OpenAIClient:
         model: str | None = None,
     ) -> StructuredResult[T]:
         model = model or self._default_model
-        request_input = cast(
-            ResponseInputParam, [{"role": m.role, "content": m.content} for m in messages]
-        )
         start = time.perf_counter()
-        response = await self._client.responses.parse(
+        response = await self._client.chat.completions.parse(
             model=model,
-            instructions=system,
-            input=request_input,
-            text_format=schema,
+            messages=_build_messages(system, messages),
+            response_format=schema,
         )
         latency_ms = round((time.perf_counter() - start) * 1000, 1)
         usage = _extract_usage(response)
-        parsed = response.output_parsed
+        parsed = response.choices[0].message.parsed
         if parsed is None:
-            raise RuntimeError("OpenAI structured parse returned no parsed output")
+            raise RuntimeError("Structured parse returned no parsed output")
         logger.info(
             "llm.parse",
             model=model,

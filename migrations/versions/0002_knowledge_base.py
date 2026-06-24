@@ -11,12 +11,12 @@ import sqlalchemy as sa
 from alembic import op
 from pgvector.sqlalchemy import Vector
 
+from app.db.models import EMBEDDING_DIM
+
 revision: str = "0002"
 down_revision: str | None = "0001"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
-
-EMBEDDING_DIM = 1536
 
 
 def upgrade() -> None:
