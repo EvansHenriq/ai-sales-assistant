@@ -92,6 +92,15 @@ uv run python scripts/create_api_key.py "demo"      # prints the key once
 uv run python scripts/demo_conversation.py --api-key <KEY>
 ```
 
+### Running without an OpenAI key
+
+Live inference uses OpenAI, so the chat/qualification demo needs a funded
+`OPENAI_API_KEY` (bring your own). Everything that does **not** depend on live
+inference runs for free: the full test suite and the deterministic guardrail eval
+suites (they mock the model), plus browsing the API contract at `/docs`. The LLM
+provider sits behind small protocols, so an alternative provider could be added
+without touching the rest of the app.
+
 ## Evaluation
 
 ```bash
