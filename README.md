@@ -18,6 +18,35 @@ analytics product called **FlowMetrics**. Each turn is grounded in a knowledge
 base, defended by guardrails, and can drive real actions — capturing the lead,
 qualifying it (BANT) and scheduling a demo.
 
+## Demo
+
+A real end-to-end run, served by a local **Ollama** model — no OpenAI key, $0:
+
+```text
+You:  Hi! What does FlowMetrics do, and how much is the Growth plan?
+Aria: FlowMetrics is a B2B SaaS platform that helps software teams see how users
+      adopt and engage with their products — conversion funnels, cohort
+      retention, and more. The Growth plan is $99/month and includes up to
+      1,000,000 monthly events, 5 projects, 12-month retention, email support
+      and alerts.
+
+You:  We're a 120-person SaaS, have budget approved, and want to go live next month.
+Aria: Given your team size and timeline I'd point you at the Scale plan —
+      unlimited projects, 24-month retention, priority support, SSO/SAML and
+      data-residency choice — with guided onboarding to go live next month.
+
+→ Captured lead:  dana@acme.com
+→ Qualification:  stage=warm  score=80   (BANT)
+→ Demo booked:    next Tuesday 2pm
+```
+
+Each reply is **grounded** in the knowledge base (the $99 price is retrieved, not
+invented), **guarded** against prompt-injection, and can drive **real actions** —
+capturing the lead, scoring it (BANT) and booking a demo, all persisted in
+Postgres.
+
+![The API in Swagger UI — eight endpoints across health, conversations and automation](docs/images/swagger-overview.png)
+
 ## Highlights
 
 - **RAG grounding** — answers are grounded in a knowledge base using
@@ -73,6 +102,8 @@ Alembic · OpenAI · structlog · slowapi · Docker · GitHub Actions · **uv**
 | POST | `/v1/conversations/{id}/schedule-demo` | Schedule a demo |
 
 All `/v1` endpoints require an `X-API-Key` header. Interactive docs at `/docs`.
+
+![Swagger UI detail — the Post Message endpoint with its `X-API-Key` header, request body and typed responses](docs/images/swagger-post-message.png)
 
 ## Quickstart
 
