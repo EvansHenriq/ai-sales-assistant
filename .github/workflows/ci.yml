@@ -74,11 +74,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Direct filesystem scan: avoids the gitleaks-action commit-range bug on
+      # the initial push (the root commit has no parent).
+      - name: Run gitleaks
+        run: |
+          version=8.24.3
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${version}/gitleaks_${version}_linux_x64.tar.gz" | tar -xz gitleaks
+          ./gitleaks dir . --redact --verbose
 
   docker-build:
     name: Docker image build
